@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+
+<launch>
+    <node name="accumulater" pkg="elevation_difference_cloud_pub" type="elevation_difference_cloud_pub" output="screen">
+        <param name="fixed_frame_id" value="/map" />
+        <param name="cloud2_v_size" value="150" />
+    </node>
+</launch>

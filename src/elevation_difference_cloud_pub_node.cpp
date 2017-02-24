@@ -23,11 +23,12 @@ class AccumulateScanNode
 
         std::string target_frame_id_, fixed_frame_id_;
 
-        tf::TransformListener tf_;
+        tf::TransformListener *tf_;
         laser_geometry::LaserProjection projector_;
 
         std::vector<sensor_msgs::PointCloud2> cloud2_v_;
         int cloud2_v_size_;
+        bool flag_;
 
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan);
         void cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud);
@@ -47,6 +48,9 @@ AccumulateScanNode::AccumulateScanNode()
     ros::NodeHandle nh;
     scan_sub_ = nh.subscribe<sensor_msgs::LaserScan>("/diag_scan", 100, &AccumulateScanNode::scanCallback, this);
     accumulate_scan_cloud_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/accumulate_scan_cloud", 100, false);
+    flag_ = true;
+
+    tf_ = new tf::TransformListener(ros::Duration(100.0),true);
 }
 
 AccumulateScanNode::~AccumulateScanNode()
@@ -63,42 +67,44 @@ sensor_msgs::PointCloud2 AccumulateScanNode::getScanCloud(const sensor_msgs::Las
 
 void AccumulateScanNode::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 {
-    static ros::Time last_cloud_pub(0,0);
-
+    // ROS_INFO_STREAM(flag_);
+    flag_ = !flag_;
+    if(flag_){
+        return;
+    }
     cloud2_v_.push_back(getScanCloud(*scan));
 
     sensor_msgs::PointCloud2 cloud2_msg;
     cloud2_msg.data.clear();
     for (int i=0; i < cloud2_v_.size(); i++) {
-    tf::StampedTransform transform;
-    try {
-      tf_.waitForTransform(scan->header.frame_id,
-                           scan->header.stamp,
-                           cloud2_v_.at(i).header.frame_id,
-                           cloud2_v_.at(i).header.stamp,
-                           fixed_frame_id_,
-                           ros::Duration(0.5));
+        tf::StampedTransform transform;
+        try {
+          tf_->waitForTransform(scan->header.frame_id,
+                               scan->header.stamp,
+                               cloud2_v_.at(i).header.frame_id,
+                               cloud2_v_.at(i).header.stamp,
+                               fixed_frame_id_,
+                               ros::Duration(0.5));
 
-      tf_.lookupTransform(target_frame_id_,
-                          scan->header.stamp,
-                          cloud2_v_.at(i).header.frame_id,
-                          cloud2_v_.at(i).header.stamp,
-                          fixed_frame_id_,
-                          transform);
-    } catch(tf::TransformException e) {
-      last_cloud_pub = scan->header.stamp;
-      cloud2_v_.clear();
-      return;
-    }
+          tf_->lookupTransform(target_frame_id_,
+                              scan->header.stamp,
+                              cloud2_v_.at(i).header.frame_id,
+                              cloud2_v_.at(i).header.stamp,
+                              fixed_frame_id_,
+                              transform);
+        } catch(tf::TransformException e) {
+          cloud2_v_.clear();
+          return;
+        }
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromROSMsg(cloud2_v_.at(i), *pcl_cloud);
-    pcl_ros::transformPointCloud(*pcl_cloud,
-                                 *pcl_cloud,
-                                 transform);
-    sensor_msgs::PointCloud2 transformed_cloud2;
-    toROSMsg (*pcl_cloud, transformed_cloud2);
-    pcl::concatenatePointCloud(cloud2_msg, transformed_cloud2, cloud2_msg);
+        pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_cloud (new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::fromROSMsg(cloud2_v_.at(i), *pcl_cloud);
+        pcl_ros::transformPointCloud(*pcl_cloud,
+                                     *pcl_cloud,
+                                     transform);
+        sensor_msgs::PointCloud2 transformed_cloud2;
+        toROSMsg (*pcl_cloud, transformed_cloud2);
+        pcl::concatenatePointCloud(cloud2_msg, transformed_cloud2, cloud2_msg);
     }
 
     cloud2_msg.header.frame_id = target_frame_id_;
