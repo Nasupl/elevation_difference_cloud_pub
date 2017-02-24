@@ -29,25 +29,18 @@ catkin_package(CATKIN_DEPENDS
   LIBRARIES elevation_difference_cloud_pub
 )
 
-include_directories(include/elevation_difference_cloud_pub include/elevation_difference_cloud_pub/map)
 include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
-
-add_library(elevation_difference_cloud_pub_map
-                    src/elevation_difference_cloud_pub/map/map.c)
-target_link_libraries(elevation_difference_cloud_pub_map)
-
 
 add_executable(elevation_difference_cloud_pub
                        src/elevation_difference_cloud_pub_node.cpp)
 
 target_link_libraries(elevation_difference_cloud_pub
-    elevation_difference_cloud_pub_map
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
 
 install( TARGETS
-    elevation_difference_cloud_pub elevation_difference_cloud_pub_map
+    elevation_difference_cloud_pub
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
